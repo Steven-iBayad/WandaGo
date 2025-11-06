@@ -1,11 +1,11 @@
-# Mother's Wonderland AR Navigation App
+# WandaGo
 
-A Flutter application that provides AR navigation for the Mother's Wonderland theme park. Users can scan QR codes from their tickets and get AR-guided directions to any of the 39 stations in the park.
+A Flutter application that provides AR navigation for the Mother's Wonderland theme park. Users can scan QR codes from their tickets and get AR-guided directions to any of the 40 stations in the park.
 
 ## Features
 
 - **QR Code Scanning**: Scan tickets to validate entry
-- **Station Selection**: Choose from 39 different stations in the park
+- **Station Selection**: Choose from 40 different stations in the park
 - **AR Navigation**: Get real-time AR arrows pointing to your selected station (Android) or compass navigation (Web)
 - **GPS Integration**: Accurate location tracking and distance calculations
 - **Modern UI**: Beautiful, intuitive interface with theme park branding
@@ -56,18 +56,18 @@ flutter run -d web-server --web-port 8080
 
 ## Station Coordinates
 
-The app includes 39 pre-configured stations with the following coordinates:
+The app includes 40 pre-configured stations with the following coordinates:
 
 - Station 1: 13.967100, 121.551584
 - Station 2: 13.967327, 121.551591
 - Station 3: 13.967195, 121.551621
-- ... (and 36 more stations)
+- ... (and 37 more stations)
 
 ## How to Use
 
 1. **Launch the app** - You'll see the Mother's Wonderland splash screen
 2. **Scan your ticket** - Use the camera to scan the QR code on your ticket
-3. **Select a station** - Browse and search through the 39 available stations
+3. **Select a station** - Browse and search through the 40 available stations
 4. **Follow navigation** - 
    - **Android**: Point your device camera to see AR arrows guiding you to your selected station
    - **Web**: Use the compass interface to navigate to your selected station
