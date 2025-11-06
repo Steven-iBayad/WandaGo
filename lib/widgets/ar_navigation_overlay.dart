@@ -1,0 +1,330 @@
+import 'package:flutter/material.dart';
+import 'dart:math' as Math;
+import '../models/station.dart';
+import '../widgets/glb_model_widget.dart';
+import '../utils/responsive_helper.dart';
+
+class ARNavigationOverlay extends StatelessWidget {
+  final Station? selectedStation;
+  final double? distance;
+  final double? bearing;
+  final double screenWidth;
+  final double screenHeight;
+
+  const ARNavigationOverlay({
+    super.key,
+    required this.selectedStation,
+    required this.distance,
+    required this.bearing,
+    required this.screenWidth,
+    required this.screenHeight,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (selectedStation == null || distance == null || bearing == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Stack(
+      children: [
+        // Vertical stack of spheres pointing toward destination
+        _buildVerticalSphereStack(context),
+        
+        // Destination pin when station is in view
+        if (_isStationInView()) _buildDestinationPin(context),
+      ],
+    );
+  }
+
+  Widget _buildVerticalSphereStack(BuildContext context) {
+    // Base size for the smallest sphere (top)
+    final double baseSize = ResponsiveHelper.getResponsiveWidth(context, 40, tabletWidth: 50, desktopWidth: 60);
+    
+    // Sphere sizes increasing from top to bottom (like the reference image)
+    final List<double> sphereSizes = [
+      baseSize * 0.6,      // Smallest (top)
+      baseSize * 0.75,     // Small
+      baseSize * 1.0,      // Medium
+      baseSize * 1.3,      // Large
+      baseSize * 1.6,      // Largest (bottom)
+    ];
+    
+    // Spacing between spheres vertically
+    final double sphereSpacing = ResponsiveHelper.getResponsiveSpacing(context, 8, tabletSpacing: 10, desktopSpacing: 12);
+    
+    // Calculate total height of the stack
+    final double totalHeight = sphereSizes.fold<double>(0, (sum, size) => sum + size) + 
+                               (sphereSizes.length - 1) * sphereSpacing;
+    
+    // Position at center of screen vertically, horizontally centered
+    final double centerY = screenHeight * 0.5;
+    final double startY = centerY - (totalHeight / 2);
+    
+    // Normalize bearing to 0-360 range
+    double normalizedBearing = bearing! % 360;
+    if (normalizedBearing < 0) normalizedBearing += 360;
+    
+    // Convert bearing to determine left/right direction
+    // Bearing: 0° = North (straight ahead), 90° = East (right), 180° = South (behind), 270° = West (left)
+    // Calculate horizontal offset direction: positive = right, negative = left
+    double horizontalDirection;
+    if (normalizedBearing <= 90) {
+      // 0-90°: Curving right (East)
+      horizontalDirection = normalizedBearing / 90.0;
+    } else if (normalizedBearing <= 180) {
+      // 90-180°: Curving right (from East to South)
+      horizontalDirection = 1.0 - ((normalizedBearing - 90) / 90.0);
+    } else if (normalizedBearing <= 270) {
+      // 180-270°: Curving left (West)
+      horizontalDirection = -((normalizedBearing - 180) / 90.0);
+    } else {
+      // 270-360°: Curving left (from West to North)
+      horizontalDirection = -1.0 + ((normalizedBearing - 270) / 90.0);
+    }
+    
+    // Maximum horizontal offset (as a percentage of screen width)
+    // The curve should be more pronounced for destinations further left/right
+    // horizontalDirection is -1.0 to 1.0 (negative = left, positive = right)
+    final double maxHorizontalOffset = screenWidth * 0.15 * horizontalDirection;
+    
+    // Calculate maximum width needed to prevent clipping
+    final double maxSphereSize = sphereSizes.reduce(Math.max);
+    final double maxHorizontalSpread = maxHorizontalOffset.abs() + maxSphereSize;
+    final double containerWidth = maxHorizontalSpread * 2.5;
+    
+    return Positioned(
+      top: startY,
+      left: (screenWidth * 0.5) - (containerWidth / 2),
+      child: SizedBox(
+        width: containerWidth,
+        height: totalHeight,
+        child: Stack(
+          children: sphereSizes.asMap().entries.map((entry) {
+            final int index = entry.key;
+            final double size = entry.value;
+            
+            // Calculate vertical position
+            double currentY = 0;
+            for (int i = 0; i < index; i++) {
+              currentY += sphereSizes[i] + sphereSpacing;
+            }
+            currentY += sphereSizes[index] / 2;
+            
+            // Calculate horizontal offset based on position in stack and bearing
+            // Lower spheres curve more (create arc pointing toward destination)
+            // Progress from 0.0 (top) to 1.0 (bottom)
+            final double progress = index / (sphereSizes.length - 1.0);
+            // Quadratic curve for smoother arc - spheres at bottom curve more
+            final double curveProgress = progress * progress;
+            // Apply the curve intensity and direction
+            final double horizontalOffset = maxHorizontalOffset * curveProgress;
+            
+            return Positioned(
+              left: (containerWidth / 2) - (size / 2) + horizontalOffset,
+              top: currentY - (size / 2),
+              child: GLBModelWidget(
+                assetPath: 'assets/models/earth.glb',
+                width: size,
+                height: size,
+                tintColor: null, // Use original model colors
+                autoRotate: true,
+                rotationSpeed: 0.5,
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDestinationPin(BuildContext context) {
+    if (selectedStation == null) return const SizedBox.shrink();
+    
+    final double base = Math.min(screenWidth, screenHeight);
+    final double pinSize = base * 0.18; // 18% of shortest dimension
+    
+    // Calculate the width needed for the station name
+    final double textPadding = ResponsiveHelper.getResponsiveSpacing(context, 12, tabletSpacing: 16, desktopSpacing: 20);
+    final double nameFontSize = ResponsiveHelper.getResponsiveFontSize(context, 16, tabletSize: 18, desktopSize: 20);
+    
+    return Positioned(
+      top: screenHeight * 0.38,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Station name above the pin
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: textPadding,
+                vertical: ResponsiveHelper.getResponsiveSpacing(context, 6, tabletSpacing: 8, desktopSpacing: 10),
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(ResponsiveHelper.getResponsiveSpacing(context, 8, tabletSpacing: 10, desktopSpacing: 12)),
+                border: Border.all(
+                  color: const Color(0xFF2E7D32),
+                  width: ResponsiveHelper.getResponsiveSpacing(context, 2, tabletSpacing: 2.5, desktopSpacing: 3),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                selectedStation!.name,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: nameFontSize,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            SizedBox(height: ResponsiveHelper.getResponsiveSpacing(context, 8, tabletSpacing: 10, desktopSpacing: 12)),
+            // Pin model
+            GLBModelWidget(
+              assetPath: 'assets/models/pin_loc.glb',
+              width: pinSize,
+              height: pinSize,
+              tintColor: const Color(0xFF2E7D32),
+              autoRotate: true,
+              rotationSpeed: 0.5,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  bool _isStationInView() {
+    // Only show pin when very close to destination (less than 10 meters)
+    return distance! < 10;
+  }
+}
+
+class ARNavigationInfo extends StatelessWidget {
+  final Station? selectedStation;
+  final double? distance;
+  final double? bearing;
+
+  const ARNavigationInfo({
+    super.key,
+    required this.selectedStation,
+    required this.distance,
+    required this.bearing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (selectedStation == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned(
+      top: ResponsiveHelper.getResponsiveSpacing(context, 15, tabletSpacing: 20, desktopSpacing: 25),
+      left: ResponsiveHelper.getResponsiveSpacing(context, 15, tabletSpacing: 20, desktopSpacing: 25),
+      right: ResponsiveHelper.getResponsiveSpacing(context, 15, tabletSpacing: 20, desktopSpacing: 25),
+      child: Container(
+        padding: ResponsiveHelper.getResponsivePadding(context, const EdgeInsets.all(12), tabletPadding: const EdgeInsets.all(16), desktopPadding: const EdgeInsets.all(20)),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(ResponsiveHelper.getResponsiveSpacing(context, 10, tabletSpacing: 12, desktopSpacing: 15)),
+          border: Border.all(color: const Color(0xFF2E7D32), width: ResponsiveHelper.getResponsiveSpacing(context, 1, tabletSpacing: 1.5, desktopSpacing: 2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                GLBModelWidget(
+                  assetPath: 'assets/models/arrow.glb',
+                  width: ResponsiveHelper.getResponsiveWidth(context, 20, tabletWidth: 24, desktopWidth: 28),
+                  height: ResponsiveHelper.getResponsiveHeight(context, 20, tabletHeight: 24, desktopHeight: 28),
+                  tintColor: null, // Use original model colors
+                ),
+                SizedBox(width: ResponsiveHelper.getResponsiveSpacing(context, 6, tabletSpacing: 8, desktopSpacing: 10)),
+                Expanded(
+                  child: Text(
+                    'Navigating to: ${selectedStation!.name}',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: ResponsiveHelper.getResponsiveFontSize(context, 14, tabletSize: 16, desktopSize: 18),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: ResponsiveHelper.getResponsiveSpacing(context, 6, tabletSpacing: 8, desktopSpacing: 10)),
+            if (distance != null)
+              Row(
+                children: [
+                  Icon(Icons.straighten, color: Colors.white70, size: ResponsiveHelper.getIconSize(context, 14, tabletSize: 16, desktopSize: 18)),
+                  SizedBox(width: ResponsiveHelper.getResponsiveSpacing(context, 3, tabletSpacing: 4, desktopSpacing: 5)),
+                  Text(
+                    'Distance: ${distance!.toStringAsFixed(0)} meters',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: ResponsiveHelper.getResponsiveFontSize(context, 12, tabletSize: 14, desktopSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            if (bearing != null)
+              Row(
+                children: [
+                  Icon(Icons.navigation, color: Colors.white70, size: ResponsiveHelper.getIconSize(context, 14, tabletSize: 16, desktopSize: 18)),
+                  SizedBox(width: ResponsiveHelper.getResponsiveSpacing(context, 3, tabletSpacing: 4, desktopSpacing: 5)),
+                  Text(
+                    'Direction: ${bearing!.toStringAsFixed(0)}°',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: ResponsiveHelper.getResponsiveFontSize(context, 12, tabletSize: 14, desktopSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            if (distance != null && distance! < 20)
+              Container(
+                margin: EdgeInsets.only(top: ResponsiveHelper.getResponsiveSpacing(context, 6, tabletSpacing: 8, desktopSpacing: 10)),
+                padding: ResponsiveHelper.getResponsivePadding(context, const EdgeInsets.symmetric(horizontal: 6, vertical: 3), tabletPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), desktopPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5)),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(ResponsiveHelper.getResponsiveSpacing(context, 3, tabletSpacing: 4, desktopSpacing: 5)),
+                  border: Border.all(color: Colors.green, width: ResponsiveHelper.getResponsiveSpacing(context, 1, tabletSpacing: 1.5, desktopSpacing: 2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GLBModelWidget(
+                      assetPath: 'assets/models/pin_loc.glb',
+                      width: ResponsiveHelper.getResponsiveWidth(context, 14, tabletWidth: 16, desktopWidth: 18),
+                      height: ResponsiveHelper.getResponsiveHeight(context, 14, tabletHeight: 16, desktopHeight: 18),
+                      tintColor: Colors.green,
+                    ),
+                    SizedBox(width: ResponsiveHelper.getResponsiveSpacing(context, 3, tabletSpacing: 4, desktopSpacing: 5)),
+                    Text(
+                      'Destination in view!',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: ResponsiveHelper.getResponsiveFontSize(context, 10, tabletSize: 12, desktopSize: 14),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

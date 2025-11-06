@@ -1,0 +1,73 @@
+name: wondago_map
+description: WondaGO Map - AR Navigation App
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # QR Code Scanning (Android + Web)
+  mobile_scanner: ^5.0.0
+  qr_flutter: ^4.1.0
+  
+  # Camera Integration
+  camera: ^0.10.5+9
+  
+  # 3D Models and AR
+  model_viewer_plus: ^1.7.0
+  # flutter_gl: ^0.0.21  # Commented out as it may cause build issues
+  
+  # Location Services (Android + Web)
+  geolocator: ^10.1.0
+  geocoding: ^2.1.1
+  
+  # Permissions
+  permission_handler: ^11.0.1
+  
+  # State Management
+  provider: ^6.1.1
+  
+  # UI Components
+  cupertino_icons: ^1.0.2
+  collection: ^1.17.2
+  
+  # Web-specific dependencies
+  url_launcher: ^6.2.1
+  web: ^0.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  web:
+    generate: true
+    image_path: "assets/images/WondaGO_logo.webp"
+    background_color: "#2E7D32"
+    theme_color: "#2E7D32"
+  windows:
+    generate: true
+    image_path: "assets/images/WondaGO_logo.webp"
+    icon_size: 48
+  macos:
+    generate: true
+    image_path: "assets/images/WondaGO_logo.webp"
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/models/
+    - assets/models/arrow.glb
+    - assets/models/pin_loc.glb
