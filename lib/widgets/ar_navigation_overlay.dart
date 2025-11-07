@@ -43,6 +43,17 @@ class ARNavigationOverlay extends StatelessWidget {
   }
 
   Widget _buildVerticalSphereStack(BuildContext context) {
+    // Check if station is behind the user (between 135° and 225°)
+    // Don't show spheres if destination is behind
+    double normalizedBearing = bearing! % 360;
+    if (normalizedBearing < 0) normalizedBearing += 360;
+    
+    // Station is behind if bearing is between 135° and 225°
+    final bool isBehind = normalizedBearing >= 135 && normalizedBearing <= 225;
+    if (isBehind) {
+      return const SizedBox.shrink();
+    }
+    
     // Base size for the smallest sphere (top)
     final double baseSize = ResponsiveHelper.getResponsiveWidth(context, 40, tabletWidth: 50, desktopWidth: 60);
     
@@ -66,32 +77,26 @@ class ARNavigationOverlay extends StatelessWidget {
     final double centerY = screenHeight * 0.5;
     final double startY = centerY - (totalHeight / 2);
     
-    // Normalize bearing to 0-360 range
-    double normalizedBearing = bearing! % 360;
-    if (normalizedBearing < 0) normalizedBearing += 360;
+    // Calculate horizontal direction based on arrow's pointing direction
+    // Arrow rotation: ((normalizedBearing - 90) * Math.pi) / 180
+    // This means: 0° bearing → arrow points up, 90° → right, 180° → down, 270° → left
+    // We want to calculate the horizontal component of the arrow direction
     
-    // Convert bearing to determine left/right direction
-    // Bearing: 0° = North (straight ahead), 90° = East (right), 180° = South (behind), 270° = West (left)
-    // Calculate horizontal offset direction: positive = right, negative = left
-    double horizontalDirection;
-    if (normalizedBearing <= 90) {
-      // 0-90°: Curving right (East)
-      horizontalDirection = normalizedBearing / 90.0;
-    } else if (normalizedBearing <= 180) {
-      // 90-180°: Curving right (from East to South)
-      horizontalDirection = 1.0 - ((normalizedBearing - 90) / 90.0);
-    } else if (normalizedBearing <= 270) {
-      // 180-270°: Curving left (West)
-      horizontalDirection = -((normalizedBearing - 180) / 90.0);
-    } else {
-      // 270-360°: Curving left (from West to North)
-      horizontalDirection = -1.0 + ((normalizedBearing - 270) / 90.0);
-    }
+    // Convert bearing to screen coordinates
+    // 0° = North (up), 90° = East (right), 180° = South (down), 270° = West (left)
+    // Calculate the horizontal component (left/right) of the direction
+    // Use sin of the bearing angle to get horizontal component
+    final double bearingRadians = (normalizedBearing * Math.pi) / 180;
+    final double horizontalComponent = Math.sin(bearingRadians);
+    
+    // Normalize to -1.0 (left) to 1.0 (right) range
+    // This directly corresponds to which direction the arrow is pointing horizontally
+    final double horizontalDirection = horizontalComponent.clamp(-1.0, 1.0);
     
     // Maximum horizontal offset (as a percentage of screen width)
     // The curve should be more pronounced for destinations further left/right
-    // horizontalDirection is -1.0 to 1.0 (negative = left, positive = right)
-    final double maxHorizontalOffset = screenWidth * 0.15 * horizontalDirection;
+    // Make the curve more pronounced (increase from 0.15 to 0.25 for better visibility)
+    final double maxHorizontalOffset = screenWidth * 0.25 * horizontalDirection;
     
     // Calculate maximum width needed to prevent clipping
     final double maxSphereSize = sphereSizes.reduce(Math.max);
@@ -120,8 +125,8 @@ class ARNavigationOverlay extends StatelessWidget {
             // Lower spheres curve more (create arc pointing toward destination)
             // Progress from 0.0 (top) to 1.0 (bottom)
             final double progress = index / (sphereSizes.length - 1.0);
-            // Quadratic curve for smoother arc - spheres at bottom curve more
-            final double curveProgress = progress * progress;
+            // Use a smoother curve - cubic for more natural arc
+            final double curveProgress = progress * progress * progress;
             // Apply the curve intensity and direction
             final double horizontalOffset = maxHorizontalOffset * curveProgress;
             
