@@ -26,13 +26,18 @@ class ARNavigationOverlay extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final bool isStationInView = _isStationInView();
+
     return Stack(
       children: [
-        // Vertical stack of spheres pointing toward destination
-        _buildVerticalSphereStack(context),
+        // Vertical stack of spheres pointing toward destination (only show when station is NOT in view)
+        if (!isStationInView) _buildVerticalSphereStack(context),
+        
+        // Navigation arrow at bottom center (only show when station is NOT in view)
+        if (!isStationInView) _buildNavigationArrow(context),
         
         // Destination pin when station is in view
-        if (_isStationInView()) _buildDestinationPin(context),
+        if (isStationInView) _buildDestinationPin(context),
       ],
     );
   }
@@ -203,6 +208,38 @@ class ARNavigationOverlay extends StatelessWidget {
     );
   }
 
+
+  Widget _buildNavigationArrow(BuildContext context) {
+    if (bearing == null) return const SizedBox.shrink();
+    
+    // Normalize bearing to 0-360 range
+    double normalizedBearing = bearing! % 360;
+    if (normalizedBearing < 0) normalizedBearing += 360;
+    
+    // Convert bearing to rotation angle (in radians)
+    // Bearing: 0° = North (pointing up), 90° = East (pointing right), etc.
+    // Flutter's rotation: 0 = pointing right, so we need to adjust
+    final double rotationAngle = ((normalizedBearing - 90) * Math.pi) / 180;
+    
+    // Position at bottom center of screen
+    final double arrowSize = ResponsiveHelper.getResponsiveWidth(context, 60, tabletWidth: 70, desktopWidth: 80);
+    final double bottomOffset = ResponsiveHelper.getResponsiveSpacing(context, 100, tabletSpacing: 120, desktopSpacing: 140);
+    
+    return Positioned(
+      bottom: bottomOffset,
+      left: (screenWidth / 2) - (arrowSize / 2),
+      child: Transform.rotate(
+        angle: rotationAngle,
+        child: GLBModelWidget(
+          assetPath: 'assets/models/arrow.glb',
+          width: arrowSize,
+          height: arrowSize,
+          tintColor: const Color(0xFF2E7D32),
+          autoRotate: false,
+        ),
+      ),
+    );
+  }
 
   bool _isStationInView() {
     // Only show pin when very close to destination (less than 10 meters)
